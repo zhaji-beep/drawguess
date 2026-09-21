@@ -1,0 +1,8 @@
+{
+  "_说明": "把本文件复制成 deploy.local.json 再填自己的值。deploy.local.json 不会进仓库。",
+  "_用法": "cp deploy.example.json deploy.local.json",
+
+  "vpsUrl": "http://你的服务器IP:3000",
+
+  "_vpsUrl说明": "launch.js 里「[2] 公网联机」要用的地址。留空或不建 deploy.local.json 的话，那一项会显示「未配置」，不影响局域网联机和 Cloudflare 隧道。"
+}

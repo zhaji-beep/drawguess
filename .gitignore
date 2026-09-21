@@ -1,0 +1,34 @@
+# ============================================================
+#  你画我猜 · 开源仓库忽略清单
+#  原则：只发布「游戏本体」，个人部署设施 / 密钥 / 二进制 / 产物 一律不进仓库
+# ============================================================
+
+# ---- 个人部署设施（含服务器 IP、root 密码、frp token，绝不能公开）----
+frp/
+start-frp.bat
+start-vpn.bat
+vpn-launch.js
+vpn-url.txt
+public-url.txt
+deploy.local.json
+服务器端部署命令.txt
+
+# ---- 大体积二进制（请自行下载，见 README）----
+tools/cloudflared.exe
+tools/*.exe
+tools/*.zip
+
+# ---- 运行时产物 / 临时文件 ----
+.tmp/
+screenshots/
+node_modules/
+*.log
+tunnel.log
+nohup.out
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

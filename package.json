@@ -1,0 +1,19 @@
+{
+  "name": "drawguess",
+  "version": "2.0.0",
+  "private": true,
+  "description": "你画我猜 · 局域网联机版（零依赖：Node 原生 http + 手写 WebSocket）",
+  "main": "server.js",
+  "author": "炸鸡（QQ 3627690979）",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/run-all.js",
+    "test:words": "node test/wordpool.js",
+    "test:e2e": "node test/e2e.js",
+    "test:v2": "node test/v2.js",
+    "test:dom": "node test/dom.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
