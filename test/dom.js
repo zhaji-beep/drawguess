@@ -51,7 +51,7 @@ let bootErr = null;
 try {
   // app.js 顶部是 'use strict'，严格模式下 eval 的声明不会挂到 window 上，
   // 所以在同一作用域里追加一行把内部函数导出来，供测试直接调用。
-  window.eval(appJs + '\n;window.__api = { handle, buildUI, S, $, strokeVisible, blindActive, isMobileLayout, copyText, advanceReveal, predictTail, setCanvasBg };');
+  window.eval(appJs + '\n;window.__api = { handle, buildUI, show, S, $, strokeVisible, blindActive, isMobileLayout, copyText, advanceReveal, predictTail, setCanvasBg };');
 } catch (e) { bootErr = e; }
 T('app.js 在真实 DOM 中初始化不报错', !bootErr, bootErr ? bootErr.message : 'buildUI + resizeCanvas 均正常');
 if (bootErr) { console.log('\n1 项失败 ❌\n'); process.exit(1); }
@@ -192,6 +192,39 @@ T('提示内容标出是谁开的天眼', /开天眼/.test($('chat').textContent
 handle({ t: 'revealUsed', penalty: 15 });
 T('开天眼按钮用后置灰并显示代价', $('tool-reveal').disabled && /-15/.test($('tool-reveal').textContent),
   $('tool-reveal').textContent);
+
+/* ---- 7.6 报错提示不该跨页残留 ----
+ * 回归：游戏里用「开天眼」到只剩一个字时服务端会回 error，
+ * 旧代码无条件把每个 error 都写进 lobby-err 且切页不清，
+ * 结果那行红字一直挂在大厅底部（用户截图发现）。 */
+api.show('screen-game');
+$('login-err').textContent = '';
+$('lobby-err').textContent = '';
+handle({ t: 'error', msg: '只剩一个字了，再揭示就没得猜啦' });
+T('游戏页收到报错 → 不写进大厅错误栏', $('lobby-err').textContent === '',
+  'lobby-err="' + $('lobby-err').textContent + '"');
+T('游戏页收到报错 → 不写进登录错误栏', $('login-err').textContent === '',
+  'login-err="' + $('login-err').textContent + '"');
+T('游戏页收到报错 → 照常进聊天记录（用户看得到）',
+  /只剩一个字了/.test($('chat').textContent), '聊天里有这行');
+
+api.show('screen-lobby');
+T('回到大厅 → 大厅错误栏是空的（修复前会残留游戏内的报错）',
+  $('lobby-err').textContent === '', 'lobby-err="' + $('lobby-err').textContent + '"');
+
+handle({ t: 'error', msg: '只有房主能改设置' });
+T('大厅里收到报错 → 正常显示在大厅错误栏', /只有房主/.test($('lobby-err').textContent),
+  'lobby-err="' + $('lobby-err').textContent + '"');
+
+api.show('screen-game');
+api.show('screen-lobby');
+T('离开大厅再回来 → 上次的大厅报错被清掉（不留陈旧提示）',
+  $('lobby-err').textContent === '', 'lobby-err="' + $('lobby-err').textContent + '"');
+
+api.show('screen-login');
+T('回到登录页 → 登录错误栏也是干净的', $('login-err').textContent === '',
+  'login-err="' + $('login-err').textContent + '"');
+api.show('screen-game');
 
 /* ---- 7.5 「一笔画完」锁板 ---- */
 T('初始未锁板', !$('board').classList.contains('locked') && !$('lock-tip').classList.contains('show'));

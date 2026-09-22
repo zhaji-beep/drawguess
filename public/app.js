@@ -113,6 +113,11 @@ const sfx = {
 
 /* ---------------- 工具 ---------------- */
 function show(screen) {
+  // 离开某页时顺手清掉它的错误提示，免得上次留下的报错一直挂在页面上。
+  // （曾经出现过：游戏里用「开天眼」到只剩一个字，服务端回 error，
+  //   回大厅后那行红字还显示在大厅底部）
+  if (screen !== 'screen-login') $('login-err').textContent = '';
+  if (screen !== 'screen-lobby') $('lobby-err').textContent = '';
   ['screen-login', 'screen-lobby', 'screen-game'].forEach((s) => $(s).classList.toggle('active', s === screen));
 }
 function esc(s) {
@@ -547,8 +552,10 @@ function handle(m) {
       break;
 
     case 'error': {
-      $('login-err').textContent = m.msg;
-      $('lobby-err').textContent = m.msg;
+      // 只往「当前正在看的那一页」的错误栏写。旧写法无条件写 login-err + lobby-err，
+      // 导致游戏内的报错（比如开天眼只剩一个字）留在大厅页底部，回大厅就一直挂着。
+      if ($('screen-login').classList.contains('active')) $('login-err').textContent = m.msg;
+      if ($('screen-lobby').classList.contains('active')) $('lobby-err').textContent = m.msg;
       // 选词阶段出错就地显示在弹窗里，否则用户会对着没反应的按钮发呆
       if (S.isDrawer && $('ov-choose').classList.contains('show')) {
         $('choose-tip').textContent = '⚠️ ' + m.msg;
