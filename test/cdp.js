@@ -7,7 +7,7 @@
  *
  * Node 22 自带全局 WebSocket 与 fetch，所以这里几乎是零依赖。
  */
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const net = require('net');
@@ -112,16 +112,22 @@ async function launch(opts) {
     exe,
     profile,
     async close() {
-      try { proc.kill(); } catch (e) {}
-      // 必须等进程真的退出再删：Windows 上 Chrome 还持有文件锁时 rmSync 会失败，
-      // 旧写法把失败 catch 掉静默了，profile 就一个个攒下来（实测攒到 57 个 / 1.2GB）。
+      // Windows 上 proc.kill() 只结束主进程，Chrome 的渲染器/GPU 子进程会晚一步退出，
+      // 期间一直占着 profile 的文件锁 → rmSync 必失败。所以要用 taskkill /T 连子进程一起杀。
+      if (process.platform === 'win32' && proc.pid) {
+        try { spawnSync('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore' }); } catch (e) {}
+      } else {
+        try { proc.kill(); } catch (e) {}
+      }
+      // 再等进程真的退出（taskkill 返回后通常已经退了，这里只是兜底）
       await waitExit(proc, 5000);
-      for (let i = 0; i < 6; i++) {
+      // 删不掉就重试：锁释放有延迟，一次删不干净很正常
+      for (let i = 0; i < 12; i++) {
         try { fs.rmSync(profile, { recursive: true, force: true }); } catch (e) {}
         if (!fs.existsSync(profile)) return;
-        await sleep(250);
+        await sleep(300);
       }
-      console.warn('  [warn] 临时 profile 没删干净（Chrome 可能还占着锁）：' + profile);
+      console.warn('  [warn] 临时 profile 没删干净（下次启动会自动清）：' + profile);
     }
   };
 }
