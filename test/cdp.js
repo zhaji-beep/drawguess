@@ -36,6 +36,22 @@ function freePort() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** 后台清理脚本：profile 被 Chrome 子进程占着时，锁释放可能要几十秒，
+ *  同步重试追不上，交给 detached 进程慢慢删（argv[1] = 要删的目录）。
+ *
+ *  ⚠️ 注意：在受限环境（沙箱/某些 CI）里 detached 子进程会随父进程一起被杀，
+ *  这条兜底可能不生效。所以真正可靠的是 launch() 里的启动清理 ——
+ *  它在每次开浏览器前把历史残留全删掉，保证最多只留 1 个（约 30MB）不增长。 */
+const BG_CLEAN = `
+const fs = require('fs');
+const p = process.argv[1];
+let n = 0;
+const t = setInterval(() => {
+  try { fs.rmSync(p, { recursive: true, force: true }); } catch (e) {}
+  if (!fs.existsSync(p) || ++n > 120) { clearInterval(t); process.exit(0); }
+}, 500);
+`;
+
 /** 等子进程真正退出（超时也返回，避免卡死） */
 function waitExit(proc, ms) {
   return new Promise((resolve) => {
@@ -122,12 +138,17 @@ async function launch(opts) {
       // 再等进程真的退出（taskkill 返回后通常已经退了，这里只是兜底）
       await waitExit(proc, 5000);
       // 删不掉就重试：锁释放有延迟，一次删不干净很正常
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 6; i++) {
         try { fs.rmSync(profile, { recursive: true, force: true }); } catch (e) {}
         if (!fs.existsSync(profile)) return;
         await sleep(300);
       }
-      console.warn('  [warn] 临时 profile 没删干净（下次启动会自动清）：' + profile);
+      // 同步重试还不够（实测锁可能几十秒后才释放）→ 试着交给后台进程继续删。
+      // 受限环境里 detached 子进程会被一起杀掉，那就只剩启动清理这道保险了。
+      try {
+        spawn(process.execPath, ['-e', BG_CLEAN, profile], { detached: true, stdio: 'ignore' }).unref();
+      } catch (e) {}
+      console.log('  （profile 仍被占用，下次启动会自动清：' + path.basename(profile) + '）');
     }
   };
 }
