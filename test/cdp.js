@@ -36,6 +36,16 @@ function freePort() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** 等子进程真正退出（超时也返回，避免卡死） */
+function waitExit(proc, ms) {
+  return new Promise((resolve) => {
+    if (proc.exitCode !== null) return resolve(true);
+    let done = false;
+    const t = setTimeout(() => { if (!done) { done = true; resolve(false); } }, ms);
+    proc.once('exit', () => { if (!done) { done = true; clearTimeout(t); resolve(true); } });
+  });
+}
+
 /** 启动一个 headless 浏览器实例 */
 async function launch(opts) {
   const exe = (opts && opts.exe) || findBrowser();
@@ -43,15 +53,20 @@ async function launch(opts) {
 
   const tmpRoot = path.join(__dirname, '..', '.tmp');
   // 清掉上次异常退出留下的 profile（一个能有二三十 MB，攒起来很吓人）
+  let cleaned = 0;
   try {
     if (fs.existsSync(tmpRoot)) {
       for (const d of fs.readdirSync(tmpRoot)) {
         if (d.startsWith('chrome-')) {
-          try { fs.rmSync(path.join(tmpRoot, d), { recursive: true, force: true }); } catch (e) {}
+          try {
+            fs.rmSync(path.join(tmpRoot, d), { recursive: true, force: true });
+            cleaned++;
+          } catch (e) { /* 还被占着就留到下次，下面的 close() 也会再试 */ }
         }
       }
     }
   } catch (e) {}
+  if (cleaned) console.log('  （清掉 ' + cleaned + ' 个上次残留的浏览器 profile）');
 
   const port = await freePort();
   const profile = (opts && opts.profile) || path.join(tmpRoot, 'chrome-' + port);
@@ -98,8 +113,15 @@ async function launch(opts) {
     profile,
     async close() {
       try { proc.kill(); } catch (e) {}
-      await sleep(300);
-      try { fs.rmSync(profile, { recursive: true, force: true }); } catch (e) {}
+      // 必须等进程真的退出再删：Windows 上 Chrome 还持有文件锁时 rmSync 会失败，
+      // 旧写法把失败 catch 掉静默了，profile 就一个个攒下来（实测攒到 57 个 / 1.2GB）。
+      await waitExit(proc, 5000);
+      for (let i = 0; i < 6; i++) {
+        try { fs.rmSync(profile, { recursive: true, force: true }); } catch (e) {}
+        if (!fs.existsSync(profile)) return;
+        await sleep(250);
+      }
+      console.warn('  [warn] 临时 profile 没删干净（Chrome 可能还占着锁）：' + profile);
     }
   };
 }

@@ -32,3 +32,6 @@ nohup.out
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# 第三方 frp 启动器（60MB 二进制，个人使用，不进仓库）
+sakura/
