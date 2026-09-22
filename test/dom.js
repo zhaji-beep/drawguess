@@ -226,6 +226,33 @@ T('回到登录页 → 登录错误栏也是干净的', $('login-err').textConte
   'login-err="' + $('login-err').textContent + '"');
 api.show('screen-game');
 
+/* ---- 7.7 换房间要清空聊天记录 ----
+ * 回归：房间被回收 → 回登录页 → 进新房间，还能看到上一局的聊天。
+ * 只判「房间号变了才清」不够：新房间若又分到同一个 4 位号就会串进来。 */
+const saySomething = (text) => handle({ t: 'chat', kind: 'chat', name: '阿甲', avatar: '🐼', text, time: 1 });
+
+$('chat').innerHTML = '';
+saySomething('上一局说的话');
+T('构造前提：聊天区里确实有上一局的消息', /上一局说的话/.test($('chat').textContent));
+
+api.show('screen-login');
+T('回到登录页（已不在任何房间）→ 聊天记录被清空', $('chat').children.length === 0,
+  $('chat').children.length + ' 条');
+
+api.show('screen-lobby');
+saySomething('旧房间的消息');
+handle({ t: 'joined', me: { id: 'p1', name: '阿甲', avatar: '🐼', host: true },
+         room: lobbyRoom({ code: '5678' }) });
+T('进入另一个房间号 → 聊天记录被清空', !/旧房间的消息/.test($('chat').textContent),
+  $('chat').textContent.trim().slice(0, 24) || '(空)');
+
+saySomething('重连前说的话');
+handle({ t: 'joined', me: { id: 'p1', name: '阿甲', avatar: '🐼', host: true },
+         room: lobbyRoom({ code: '5678' }) });
+T('重连回同一房间 → 聊天记录保留（不白丢历史）',
+  /重连前说的话/.test($('chat').textContent),
+  /重连前说的话/.test($('chat').textContent) ? '保留' : '被误清');
+
 /* ---- 7.5 「一笔画完」锁板 ---- */
 T('初始未锁板', !$('board').classList.contains('locked') && !$('lock-tip').classList.contains('show'));
 handle({ t: 'boardLock', locked: true });

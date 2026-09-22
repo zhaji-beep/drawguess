@@ -118,6 +118,10 @@ function show(screen) {
   //   回大厅后那行红字还显示在大厅底部）
   if (screen !== 'screen-login') $('login-err').textContent = '';
   if (screen !== 'screen-lobby') $('lobby-err').textContent = '';
+  // 回到登录页 = 已经不在任何房间里了 → 聊天记录也该跟着结束。
+  // 只靠「房间号变了才清」不够：房间被回收后若新房间又分到同一个 4 位号，
+  // 上一局的聊天就会串进新房间。
+  if (screen === 'screen-login') clearChat();
   ['screen-login', 'screen-lobby', 'screen-game'].forEach((s) => $(s).classList.toggle('active', s === screen));
 }
 function esc(s) {
@@ -190,6 +194,12 @@ function addMsg(html, cls) {
   $('chat').appendChild(d);
   while ($('chat').children.length > 300) $('chat').removeChild($('chat').firstChild);
   scrollChat();
+}
+/** 清空聊天区。换房间时调用 —— 旧房间的消息跟新房间没关系
+ *  （曾经出现过：房间被回收 → 回登录页 → 进新房间，还能看到上一局的聊天记录） */
+function clearChat() {
+  const box = $('chat');
+  if (box) box.innerHTML = '';
 }
 
 /* ==================================================================
@@ -301,6 +311,8 @@ function handle(m) {
       S.joined = true;
       S.room = m.room;
       loading = false;
+      // 进的是另一个房间 → 先把上一局的聊天记录清掉（重连回同一房间则保留）
+      if (S.myRoomCode && m.room.code !== S.myRoomCode) clearChat();
       if (m.themeMeta) S.themeMeta = m.themeMeta;
       if (m.limitMeta) S.limitMeta = m.limitMeta;
       if (m.cats) { S.cats = m.cats; buildThemeChips(); }
